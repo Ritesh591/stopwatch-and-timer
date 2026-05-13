@@ -1,73 +1,135 @@
-# React + TypeScript + Vite
+# ChronoLab — Stopwatch & Timer
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A polished, responsive **Stopwatch and Countdown Timer** app built with React 19, TypeScript, Vite, and Tailwind CSS v4. Features a working light/dark theme toggle (persisted across reloads) and drift-free time tracking using `requestAnimationFrame` + timestamps.
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- **Stopwatch**
+  - Start, Pause, Resume, Reset
+  - Centisecond precision (`MM:SS.cc`)
+- **Countdown Timer**
+  - Custom duration via hours / minutes / seconds inputs (validated, capped at 99h)
+  - Start, Pause, Resume, Reset
+  - Auto-stops at zero with a clear "Time's up!" state
+  - Format adapts: `MM:SS` or `HH:MM:SS`
+- **Theme**
+  - Explicit light / dark toggle with smooth transitions
+  - Persists via `localStorage`; respects `prefers-color-scheme` on first visit
+  - No flash of unstyled content (inline pre-paint script in `index.html`)
+- **UX**
+  - Animated accent ring while running
+  - `aria-live` time readouts for screen readers
+  - Accessible tablist for switching modes
+  - Fully responsive (mobile → desktop)
 
-## React Compiler
+## Tech stack
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+| Layer       | Choice                                          |
+| ----------- | ----------------------------------------------- |
+| Framework   | [React 19](https://react.dev) + TypeScript      |
+| Build tool  | [Vite 8](https://vite.dev)                      |
+| Styling     | [Tailwind CSS v4](https://tailwindcss.com) (`@tailwindcss/vite`) |
+| State       | Local React hooks (`useState` + `useRef` + rAF) |
+| Linting     | ESLint + typescript-eslint                      |
 
-## Expanding the ESLint configuration
+## Getting started
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+### Prerequisites
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+- [Node.js](https://nodejs.org) ≥ 20, or [Bun](https://bun.sh) ≥ 1.0
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+### Install
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+bun install
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+> Using npm or pnpm? Replace `bun` with `npm` / `pnpm` in any command below.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+### Run the dev server
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+bun run dev
 ```
+
+Vite will start on [http://localhost:5173](http://localhost:5173) (or the next free port).
+
+### Production build
+
+```bash
+bun run build
+```
+
+Outputs static assets to `dist/`.
+
+### Preview the production build
+
+```bash
+bun run preview
+```
+
+### Lint
+
+```bash
+bun run lint
+```
+
+## Project structure
+
+```
+stopwatch-and-timer/
+├── index.html              # Anti-FOUC theme bootstrap script + root markup
+├── vite.config.ts          # Vite + @tailwindcss/vite plugin
+└── src/
+    ├── main.tsx            # React entry
+    ├── App.tsx             # Shell: header, hero, mode tabs, panels, footer
+    ├── index.css           # Tailwind v4 import + @theme tokens (light + dark)
+    ├── hooks/
+    │   ├── useStopwatch.ts # idle | running | paused state machine
+    │   ├── useTimer.ts     # idle | running | paused | finished countdown
+    │   └── useTheme.ts     # localStorage-backed light/dark toggle
+    ├── lib/
+    │   └── formatTime.ts   # formatStopwatch / formatTimer helpers
+    └── components/
+        ├── ModeTabs.tsx       # Accessible Stopwatch/Timer tablist
+        ├── StopwatchPanel.tsx
+        ├── TimerPanel.tsx
+        ├── TimeDisplay.tsx    # Large monospace tabular-nums display
+        ├── ControlButton.tsx  # primary / secondary / danger variants
+        └── ThemeToggle.tsx    # Sliding pill toggle with sun/moon icons
+```
+
+## How time tracking works
+
+Rather than using `setInterval` (which drifts and can pause when the tab is inactive), both hooks anchor to wall-clock time:
+
+```ts
+// Conceptual
+runStartedAt = Date.now();      // when current run segment began
+baseElapsedMs = 0;              // accumulated time from prior segments
+
+// On each animation frame
+elapsedMs = baseElapsedMs + (Date.now() - runStartedAt);
+
+// On pause
+baseElapsedMs += Date.now() - runStartedAt;
+// rAF loop is cancelled until resume
+```
+
+This keeps the display accurate even after the tab is backgrounded and re-foregrounded.
+
+## Theme system
+
+- `useTheme` toggles `class="dark"` on `<html>` and writes to `localStorage`.
+- `src/index.css` defines two sets of CSS custom properties under `@theme` (light defaults) and `.dark` (overrides), so Tailwind utilities like `bg-(--color-surface)` automatically switch themes.
+- An inline script in `index.html` reads the saved preference (or system preference) **before** React mounts, preventing a flash of the wrong theme.
+
+## Customization
+
+- **Accent color** — change `--color-accent` (and the dark-mode override) in [`src/index.css`](src/index.css).
+- **Stopwatch precision** — edit `formatStopwatch` in [`src/lib/formatTime.ts`](src/lib/formatTime.ts) to show milliseconds instead of centiseconds.
+- **Timer max** — adjust the `max` props on `DurationInput` instances in [`src/components/TimerPanel.tsx`](src/components/TimerPanel.tsx).
+
+## License
+
+MIT — free to use, modify, and distribute.
